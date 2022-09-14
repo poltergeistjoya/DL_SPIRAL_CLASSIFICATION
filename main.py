@@ -3,30 +3,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
+import sys
 
 from absl import flags
-
-#random number generator
-rng = np.random.default_rng()
-#Generate spiral data, vary r while moving through x and y
-clean_r = np.linspace(1,12, 1000)
-clean_theta1=np.linspace(6,2.5,1000)
-clean_theta2 = np.linspace(5, 1.5, 1000)
-
-#make noisy draw from normal dist
-r = rng.normal(loc= clean_r, scale =0.1)
-theta1 = rng.normal(loc= clean_theta1, scale =0.1)
-theta2 = rng.normal(loc= clean_theta2, scale =0.1)
-
-x1=r*np.cos(np.pi*theta1)
-y1=r*np.sin(np.pi*theta1)
-
-x2=r*np.cos(np.pi*theta2)
-y2=r*np.sin(np.pi*theta2)
-
-#Combine spiral data to make one training set
-data_x = np.append(x1,x2)
-data_y = np.append(y1,y2)
 
 
 #All flags
@@ -59,26 +38,51 @@ class Model(tf.Module):
         #last layer activated by sigmoid ? passed through sigmoid
         print("hello")
 
-
-#PLOTTING
-fig, ax = plt.subplots(1,1, figsize=(15,15), dpi = 200)
-ax.set_title("Spirals")
-ax.set_xlabel("Spiral Radius")
-ax.set_ylabel("Spiral Radius")
-ax.set_xlim(-15, 15)
-ax.set_ylim(-15, 15)
-
-ax.plot(x1,y1, "o", x2,y2, "o")
-
-plt.savefig("./spirals.pdf")
-
-#plot with contour map instead not scatterplot
-
-
-#papers say don't use L2 with ADAM, use weight decay instead
-#WHAT IS THIS A INSIDE OF HERE??
 def main():
-    print("in main")
+
+    #parse flags before we use them
+    FLAGS(sys.argv)
+
+    #set seed for reproducible results
+    seed_sequence = np.random.SeedSequence(FLAGS.random_seed)
+    np_seed, tf_seed = seed_sequence.spawn(2) #spawn 2 sequences for 2 threads
+
+    #why do we need two different random seed sequences?
+    np_rng =np.random.default_rng(np_seed)
+    tf_rng = tf.random.Generator.from_seed(tf_seed.entropy)
+
+    #Generate spiral data, vary r while moving through x and y
+    clean_r = np.linspace(1,12, FLAGS.num_samples)
+    clean_theta1=np.linspace(6,2.5, FLAGS.num_samples)
+    clean_theta2 = np.linspace(5, 1.5, FLAGS.num_samples)
+
+    #make noisy draw from normal dist
+    r = np_rng.normal(loc= clean_r, scale =0.1)
+    theta1 = np_rng.normal(loc= clean_theta1, scale =0.1)
+    theta2 = np_rng.normal(loc= clean_theta2, scale =0.1)
+
+    x1=r*np.cos(np.pi*theta1)
+    y1=r*np.sin(np.pi*theta1)
+
+    x2=r*np.cos(np.pi*theta2)
+    y2=r*np.sin(np.pi*theta2)
+
+    #Combine spiral data to make one training set
+    data_x = np.append(x1,x2)
+    data_y = np.append(y1,y2)
+
+    #PLOTTING
+    fig, ax = plt.subplots(1,1, figsize=(15,15), dpi = 200)
+    ax.set_title("Spirals")
+    ax.set_xlabel("Spiral Radius")
+    ax.set_ylabel("Spiral Radius")
+    ax.set_xlim(-15, 15)
+    ax.set_ylim(-15, 15)
+    ax.plot(x1, y1, "o", x2, y2, "o")
+
+    plt.savefig("./spiralstest.pdf")
+
+    #plot with contour map instead not scatterplot
 
 #this makes sure the main function runs first
 if __name__ == "__main__":
