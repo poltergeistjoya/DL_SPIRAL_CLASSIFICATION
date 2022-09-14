@@ -6,10 +6,61 @@ import tensorflow as tf
 import sys
 
 from absl import flags
+from tqdm import trange
 
+from dataclasses import dataclass, field, InitVar
 
-#All flags
-#WHAT IS DEBUG USED FOR????
+@dataclass
+class Data:
+    rng: InitVar[np.random.Generator]
+    num_samples: int
+
+    x1: np.ndarray = field(init=False)
+    y1: np.ndarray = field(init=False)
+    x2: np.ndarray = field(init=False)
+    y2: np.ndarray = field(init=False)
+
+    x: np.ndarray = field(init=False)
+    y: np.ndarray = field(init=False)
+    tclass: np.ndarray = field(init=False)
+
+    def __post_init__(self, rng):
+        #return evenly spaced values from 0 to num_samples
+        self.index = np.arange(self.num_samples)
+
+        #Generate spiral data, vary r while moving through x and y
+        half_data = self.num_samples // 2
+        clean_r = np.linspace(1,12, half_data)
+        clean_theta1=np.linspace(6,2.5, half_data)
+        clean_theta2 = np.linspace(5, 1.5, half_data)
+
+        #make noisy draw from normal dist
+        r = rng.normal(loc= clean_r, scale =0.1)
+        theta1 = rng.normal(loc= clean_theta1, scale =0.1)
+        theta2 = rng.normal(loc= clean_theta2, scale =0.1)
+
+        self.x1=r*np.cos(np.pi*theta1)
+        self.y1=r*np.sin(np.pi*theta1)
+
+        self.x2=r*np.cos(np.pi*theta2)
+        self.y2=r*np.sin(np.pi*theta2)
+
+        #make output data
+        class0 = np.zeros(half_data, dtype=int)
+        class1 = np.ones(half_data, dtype=int)
+
+        #Combine data vectors to make whole training and output set
+        self.x = np.append(self.x1,self.x2)
+        self.y = np.append(self.y1,self.y2)
+        self.tclass = np.append(class0,class1)
+
+    def get_batch(self, rng, batch_size):
+        choices = rng.choice(self.index, size = batch_size)
+        return self.x[choices], self.y[choices], self.tclass[choices]
+
+    def get_spirals(self):
+        return self.x1, self.y1, self.x2, self.y2
+
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("num_samples", 200, "Number of samples in dataset")
 flags.DEFINE_integer("batch_size", 50, "Number of samples in batch")
@@ -18,25 +69,58 @@ flags.DEFINE_float("learning_rate", 0.1, "Learning rate/initial step size")
 flags.DEFINE_integer("random_seed", 31415, "Random seed for reproducible results")
 flags.DEFINE_float("sigma_noise", 0.5, "Standard deviation of noise random variable")
 
-#make layer class
-class Layer(tf.Module):
-    print("make layer class")
+#i attempted to matmul my layers which i made by passing input through activation function and then matmuling, but i kept getting lost in the sauce so i turned to the internet
 
+#make layer class
+#https://www.tensorflow.org/guide/core/mlp_core#multilayer_perceptron_mlp_overview
+#document sent to me by Husam, who also helped with my code
+
+#must initialize weights properly to prevent activation outputs from becoming too large or small, use xavier init method to do so
+def xavier_init(shape):
+        in_dim, out_dim = shape
+        in_dim= tf.cast(in_dim, tf.int32)
+        out_dim = tf.cast(out_dim, tf.int32)
+        xavier_lim = tf.sqrt(6.)/tf.sqrt(tf.cast(in_dim + out_dim, tf.float32))
+        weight_vals =tf.random.uniform(shape=(in_dim, out_dim), minval=-xavier_lim, maxval=xavier_lim, seed =22)
+        return weight_vals
+
+
+class Layer(tf.Module):
+
+    def __init__(self, out_dim, weight_init = xavier_init, activation = tf.nn.relu):
+        self.out_dim=out_dim
+        self.weight_init = weight_init
+        self.activation = activation
+        self.built = False
+
+    def __call__(self,x):
+        if not self.built:
+            #get input dimension by first input layer
+            self.in_dim = x.shape[1]
+            #get weight and bias using xavier scheme
+            self.w = tf.Variable(xavier_init(shape=(self.in_dim, self.out_dim)))
+            self.b = tf.Variable(tf.zeros(shape=(self.out_dim,)))
+            self.built = True
+            print(type(x))
+            print(type(self.w))
+
+        float64w = tf.cast(self.w, tf.float64)
+        float64b = tf.cast(self.b, tf.float64)
+        z = x @ float64w + float64b
+        return self.activation(z)
 
 #feed in x, y, and category as training data, predict boundaries with multilayer perceptron
 class Model(tf.Module):
-        #variables to be tuned in inits
-        #initialize 3 hidden layers with appropriate sizes for dimensionality
-        #SHOULD THE OUTPUT LAYER BE IN HERE?? YES RIGHT CUZ IT ALSO HAS TUNABLE WEIGHTS
-    def __init__(self):
-        print("make model with layer class")
+        #variables to be tuned in inits, the layers that will be made by layer class when we call model in main
+    def __init__(self, layers):
+        self.layers = layers
 
-        #this makes output, multiply by sigmoid in the end
-    def __call__(self):
-        #pass input through relu
-        #DO I MAKE A NEW SET OF ALL THE X1Y1 X2 Y2 FROM BEFORE ? OR DO I JUST PASS THEM ALL THROUGH HOW DO I DO THAT??/
-        #last layer activated by sigmoid ? passed through sigmoid
-        print("hello")
+    @tf.function
+    def __call__(self, x, preds = False):
+        #for each layer initialized, make a layer
+            for layer in self.layers:
+                x = layer(x)
+            return x
 
 def main():
 
@@ -51,27 +135,32 @@ def main():
     np_rng =np.random.default_rng(np_seed)
     tf_rng = tf.random.Generator.from_seed(tf_seed.entropy)
 
-    #Generate spiral data, vary r while moving through x and y
-    clean_r = np.linspace(1,12, FLAGS.num_samples)
-    clean_theta1=np.linspace(6,2.5, FLAGS.num_samples)
-    clean_theta2 = np.linspace(5, 1.5, FLAGS.num_samples)
+    #Generate data
 
-    #make noisy draw from normal dist
-    r = np_rng.normal(loc= clean_r, scale =0.1)
-    theta1 = np_rng.normal(loc= clean_theta1, scale =0.1)
-    theta2 = np_rng.normal(loc= clean_theta2, scale =0.1)
+    data = Data(np_rng, FLAGS.num_samples)
 
-    x1=r*np.cos(np.pi*theta1)
-    y1=r*np.sin(np.pi*theta1)
+    #call model and feed in x, y, and true category as training data, predict boundaries with multilayer perceptron
+    model = Model([
+        Layer(32),
+        Layer(32),
+        Layer(1, activation=tf.math.sigmoid)])
 
-    x2=r*np.cos(np.pi*theta2)
-    y2=r*np.sin(np.pi*theta2)
+    optimizer = tf.optimizers.Adam(learning_rate = FLAGS.learning_rate)
 
-    #Combine spiral data to make one training set
-    data_x = np.append(x1,x2)
-    data_y = np.append(y1,y2)
+    #makes the sexy bar that shows progress of our training
+    bar = trange(FLAGS.num_iters)
+
+    for i in bar:
+        with tf.GradientTape() as tape:
+            x,y, tclass = data.get_batch(np_rng, FLAGS.batch_size)
+            #make coordinates into tuple so xavier init can get first input dim, make batch_size num of columns
+            xycoord = np.append(tf.squeeze(x), tf.squeeze(y)).reshape(2,FLAGS.batch_size).T
+            class_hat = model(xycoord, tf_rng)
+            temp_loss = (-tclass*tf.math.log(class_hat)+1e-25) -((1-tclass)*tf.math.log(1-class_hat) +1e-25)
+            #l2_reg_const = 0.001 * tf.reduce_mean([
 
     #PLOTTING
+    x1,y1,x2,y2 = data.get_spirals()
     fig, ax = plt.subplots(1,1, figsize=(15,15), dpi = 200)
     ax.set_title("Spirals")
     ax.set_xlabel("Spiral Radius")
@@ -83,7 +172,5 @@ def main():
     plt.savefig("./spiralstest.pdf")
 
     #plot with contour map instead not scatterplot
-
-#this makes sure the main function runs first
 if __name__ == "__main__":
     main()
