@@ -1,6 +1,10 @@
+#!/usr/bin/env python3
+
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
+
+from absl import flags
 
 #random number generator
 rng = np.random.default_rng()
@@ -9,7 +13,7 @@ clean_r = np.linspace(1,12, 1000)
 clean_theta1=np.linspace(6,2.5,1000)
 clean_theta2 = np.linspace(5, 1.5, 1000)
 
-#make noisy draw fromm normal dist
+#make noisy draw from normal dist
 r = rng.normal(loc= clean_r, scale =0.1)
 theta1 = rng.normal(loc= clean_theta1, scale =0.1)
 theta2 = rng.normal(loc= clean_theta2, scale =0.1)
@@ -20,13 +24,25 @@ y1=r*np.sin(np.pi*theta1)
 x2=r*np.cos(np.pi*theta2)
 y2=r*np.sin(np.pi*theta2)
 
-#make relu activation function
-#not sure how the sizes will work here
-def relu(x,y):
-    if argmax(0,x) > 0:
-        return y
-    else
-        return 0
+#Combine spiral data to make one training set
+data_x = np.append(x1,x2)
+data_y = np.append(y1,y2)
+
+
+#All flags
+#WHAT IS DEBUG USED FOR????
+FLAGS = flags.FLAGS
+flags.DEFINE_integer("num_samples", 200, "Number of samples in dataset")
+flags.DEFINE_integer("batch_size", 50, "Number of samples in batch")
+flags.DEFINE_integer("num_iters", 300, "Number of forward/backward pass iterations")
+flags.DEFINE_float("learning_rate", 0.1, "Learning rate/initial step size")
+flags.DEFINE_integer("random_seed", 31415, "Random seed for reproducible results")
+flags.DEFINE_float("sigma_noise", 0.5, "Standard deviation of noise random variable")
+
+#make layer class
+class Layer(tf.Module):
+    print("make layer class")
+
 
 #feed in x, y, and category as training data, predict boundaries with multilayer perceptron
 class Model(tf.Module):
@@ -34,18 +50,14 @@ class Model(tf.Module):
         #initialize 3 hidden layers with appropriate sizes for dimensionality
         #SHOULD THE OUTPUT LAYER BE IN HERE?? YES RIGHT CUZ IT ALSO HAS TUNABLE WEIGHTS
     def __init__(self):
-        self.layer1 = tf.Variable(rng(normal(shape[2,6])))
-        self.layer2 = tf.Variable(rng(normal(shape[6,6])))
-        self.layer3 = tf.Variable(rng(normal(shape[6,6])))
-        self.output = tf.Variable(rng(normal(shape[6,2])))
+        print("make model with layer class")
 
         #this makes output, multiply by sigmoid in the end
     def __call__(self):
         #pass input through relu
         #DO I MAKE A NEW SET OF ALL THE X1Y1 X2 Y2 FROM BEFORE ? OR DO I JUST PASS THEM ALL THROUGH HOW DO I DO THAT??/
-        relu(x,y)
         #last layer activated by sigmoid ? passed through sigmoid
-
+        print("hello")
 
 
 #PLOTTING
@@ -64,3 +76,10 @@ plt.savefig("./spirals.pdf")
 
 
 #papers say don't use L2 with ADAM, use weight decay instead
+#WHAT IS THIS A INSIDE OF HERE??
+def main():
+    print("in main")
+
+#this makes sure the main function runs first
+if __name__ == "__main__":
+    main()
