@@ -39,6 +39,7 @@ class Data:
         theta1 = rng.normal(loc= clean_theta1, scale =0.1)
         theta2 = rng.normal(loc= clean_theta2, scale =0.1)
 
+        #had to astype everything to float 32 due to casting error later
         self.x1=r*np.cos(np.pi*theta1).astype(np.float32)
         self.y1=r*np.sin(np.pi*theta1).astype(np.float32)
 
@@ -73,7 +74,7 @@ flags.DEFINE_float("sigma_noise", 0.5, "Standard deviation of noise random varia
 
 #make layer class
 #https://www.tensorflow.org/guide/core/mlp_core#multilayer_perceptron_mlp_overview
-#document sent to me by Husam, who also helped with my code
+#document sent to me by Husam
 
 #must initialize weights properly to prevent activation outputs from becoming too large or small, use xavier init method to do so
 def xavier_init(shape):
@@ -156,6 +157,7 @@ def main():
             xycoord = np.append(tf.squeeze(x), tf.squeeze(y)).reshape(2,FLAGS.batch_size).T
             tclass = tf.squeeze(tclass)
             class_hat = tf.squeeze(model(xycoord, tf_rng))
+            #add tiny constant so loss is not 0
             temp_loss = tf.reduce_mean((-tclass*tf.math.log(class_hat)+1e-25) -((1-tclass)*tf.math.log(1-class_hat) +1e-25))
             l2_reg_const = 0.001 * tf.reduce_mean([tf.nn.l2_loss(v) for v in model.trainable_variables ])
             loss = temp_loss + l2_reg_const
@@ -169,6 +171,7 @@ def main():
         #bar.set_description(f"Loss @ {i} => {loss.numpy():0.3f}")
         bar.refresh()
 
+    #due to the time constraint and my inability to make my plot work, this plot is heavily baseed on Husam's plotting section
     #PLOTTING
     N_points = 100
     axis = np.linspace(-15,15, 1000).astype(np.float32)
@@ -178,12 +181,12 @@ def main():
     y = model(coords, tf_rng)
     output = tf.squeeze(y)
 
-    # Plot real samples and predicted boundary curve at p(x) = 0.5
     plt.figure()
     num_samples = FLAGS.num_samples
     plt.plot(data.x[:num_samples//2], data.y[:num_samples//2], "o", color="red")
     plt.plot(data.x[num_samples//2:], data.y[num_samples//2:], "o", color="blue")
     plt.legend(["Data 0", "Data 1"])
+    #make boundary point at 0.5 bc aligns with sigmoid output layer
     plt.contourf(x_ax, y_ax, output.numpy().reshape(1000, 1000), [0, 0.5, 1], colors=["lightcoral", "steelblue"])
     plt.title("Spiral Data")
 
@@ -200,8 +203,7 @@ def main():
     #ax.set_ylim(-15, 15)
     #ax.plot(x1, y1, "o", x2, y2, "o")
 
-    plt.savefig("./spirals1test.pdf")
+   # plt.savefig("./spirals1test.pdf
 
-    #plot with contour map instead not scatterplot
 if __name__ == "__main__":
     main()
